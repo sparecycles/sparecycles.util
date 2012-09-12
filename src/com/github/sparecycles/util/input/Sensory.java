@@ -7,14 +7,17 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.util.Log;
+
 import java.lang.ref.WeakReference;
 
 public abstract class Sensory implements SensorEventListener {
 	static final HashSet<WeakReference<Sensory> > sensors = new HashSet<WeakReference<Sensory> >();
 
-	final Context context;
-	final int sensor_delay, sensor_type;
-	float values[];
+	protected final Context context;
+	protected final int sensor_delay, sensor_type;
+	protected float values[];
+	protected Sensor sensor;
 	WeakReference<Sensory> entry;
 	
 	Sensory(Context context, int sensor_type, int sensor_delay)
@@ -33,7 +36,7 @@ public abstract class Sensory implements SensorEventListener {
 	
 	public void activate() {
 		SensorManager manager = (SensorManager)context.getSystemService(Context.SENSOR_SERVICE);
-		Sensor sensor = manager.getDefaultSensor(sensor_type);
+		sensor = manager.getDefaultSensor(sensor_type);
 		if(sensor != null) {
 			manager.registerListener(this, sensor, sensor_delay);
 		}
@@ -42,6 +45,7 @@ public abstract class Sensory implements SensorEventListener {
 	public void deactivate() {
 		SensorManager manager = (SensorManager)context.getSystemService(Context.SENSOR_SERVICE);
 		manager.unregisterListener(this);
+		sensor = null;
 	}
 	
 	public static void activateAll() {
@@ -69,6 +73,27 @@ public abstract class Sensory implements SensorEventListener {
 	@Override
 	public abstract void onSensorChanged(SensorEvent event);
 	
+	public static class Proximity extends Sensory {
+		public interface Listener {
+			void values(boolean close);
+		};
+		
+		Listener listener;
+
+		public Proximity(Context context, Listener listener) {
+			super(context, Sensor.TYPE_PROXIMITY, SensorManager.SENSOR_DELAY_NORMAL);
+			this.listener = listener;
+		}
+
+		@Override
+		public void onSensorChanged(SensorEvent event) {
+			float value = event.values[0];
+			Log.d("proximity", "value: " + value);
+			listener.values(value < sensor.getMaximumRange());
+		}
+		
+	};
+	
 	public static class Accelerometer extends Sensory {
 		public interface Listener {
 			void values(float x, float y, float z);
@@ -92,5 +117,5 @@ public abstract class Sensory implements SensorEventListener {
 			float values[] = event.values;
 			listener.values(values[0], values[1], values[2]);
 		}
-	}
+	}	
 }
